@@ -29,5 +29,75 @@
 <script>
 const supabase = window.supabase.createClient(
   "https://kxlyznicrimozmdsdxyt.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt4bHl6bmljcmltb3ptZHNkeHl0Iiwicm9sZSI6ImFub
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt4bHl6bmljcmltb3ptZHNkeHl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5NTkyNzIsImV4cCI6MjA3MjUzNTI3Mn0.YS_k41cHlr3seq_3ttfMckadMpGxZ62LpFFIzpbdHZM"
+);
 
+const REDIRECT = "https://tbojalad.github.io/throsindex/";
+
+// 🔹 Check if already signed in on page load
+async function checkSession() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.user) {
+    showApp(session.user);
+  } else {
+    document.getElementById('auth').style.display = 'block';
+    document.getElementById('app').style.display = 'none';
+  }
+}
+checkSession();
+
+// 🔹 Also respond to changes in auth state
+supabase.auth.onAuthStateChange((_event, session) => {
+  if (session?.user) {
+    showApp(session.user);
+  } else {
+    document.getElementById('auth').style.display = 'block';
+    document.getElementById('app').style.display = 'none';
+  }
+});
+
+document.getElementById('login').onclick = async () => {
+  const email = document.getElementById('email').value;
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: REDIRECT }
+  });
+  document.getElementById('authMsg').textContent = error ? error.message : "Check your email for login link";
+};
+
+document.getElementById('logout').onclick = async () => {
+  await supabase.auth.signOut();
+  location.reload();
+};
+
+// 🔹 Show the logged-in app
+function showApp(user) {
+  document.getElementById('auth').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('user').textContent = "Signed in as " + (user.email || "");
+  loadPRs();
+}
+
+document.getElementById('savePR').onclick = async () => {
+  const ev = document.getElementById('event').value;
+  const wt = parseFloat(document.getElementById('wt').value);
+  const dist = parseFloat(document.getElementById('dist').value);
+  const { data: { user } } = await supabase.auth.getUser();
+  const { error } = await supabase.from('prs').insert({
+    user_id: user.id,
+    event: ev,
+    implement_weight: wt,
+    weight_unit: "lb",
+    distance: dist,
+    distance_unit: "ft"
+  });
+  document.getElementById('msg').textContent = error ? error.message : "Saved!";
+  loadPRs();
+};
+
+async function loadPRs() {
+  const { data, error } = await supabase.from('prs').select('*').order('created_at', { ascending: false }).limit(20);
+  if (error) { document.getElementById('myPRs').textContent = error.message; return; }
+  document.getElementById('myPRs').innerHTML = "<ul>" + data.map(r => `<li>${r.event}: ${r.distance} ${r.distance_unit}</li>`).join('') + "</ul>";
+}
+</script>
